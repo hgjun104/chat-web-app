@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    <title>WebSocket Chat Application</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+        }
+        
+        .chat-container {
+            max-width: 1000px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 40px);
+        }
+        
+        .chat-header {
+            padding: 15px;
+            background: #4e73df;
+            color: white;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .username-input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        
+        .connect-button {
+            padding: 8px 15px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .chat-content {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        
+        .user-list {
+            width: 200px;
+            background: #f8f9fa;
+            padding: 15px;
+            overflow-y: auto;
+            border-right: 1px solid #eee;
+        }
+        
+        .user {
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+        
+        .user:hover {
+            background: #e9ecef;
+        }
+        
+        .user.selected {
+            background: #e2e6ea;
+            font-weight: bold;
+        }
+        
+        .chat-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .message-list {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 70%;
+        }
+        
+        .message.public {
+            background: #f0f2f5;
+            align-self: flex-start;
+        }
+        
+        .message.private {
+            background: #dcf8c6;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        
+        .message.system {
+            background: #f8f9fa;
+            align-self: center;
+            max-width: 100%;
+            font-style: italic;
+            color: #6c757d;
+        }
+        
+        .sender {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .message-input-container {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #eee;
+        }
+        
+        .message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        
+        .send-button {
+            padding: 10px 20px;
+            background: #4e73df;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>WebSocket Chat</h2>
+            <div class="user-info">
+                <input type="text" id="username" class="username-input" placeholder="Enter your username" value="">
+                <button id="connect" class="connect-button">Connect</button>
+                <button id="disconnect" class="connect-button" style="background: #dc3545; display: none;">Disconnect</button>
+            </div>
+        </div>
+        
+        <div class="chat-content">
+            <div class="user-list" id="userList">
+                <h3>Users</h3>
+                <div id="users">
+                    <div class="user selected" data-username="public">Public Channel</div>
+                </div>
+            </div>
+            
+            <div class="chat-area">
+                <div class="message-list" id="messageList">
+                    <!-- Messages will be added here -->
+                </div>
+                
+                <div class="message-input-container">
+                    <input type="text" id="messageInput" class="message-input" placeholder="Type a message..." disabled>
+                    <button id="sendButton" class="send-button" disabled>Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load external scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+    <script>
+        let stompClient = null;
+        let selectedUser = 'public';
+        let currentUsername = '';
+        let connectedUsers = new Set(['public']);
+
+        const connectButton = document.getElementById('connect');
+        const disconnectButton = document.getElementById('disconnect');
+        const usernameInput = document.getElementById('username');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const messageList = document.getElementById('messageList');
+        const userList = document.getElementById('userList');
+        const users = document.getElementById('users');
+
+        connectButton.addEventListener('click', connect);
+        disconnectButton.addEventListener('click', disconnect);
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function connect() {
+            currentUsername = usernameInput.value.trim();
+            
+            if (!currentUsername) {
+                alert('Please enter your username');
+                return;
+            }
+
+            // Add a fake "alice" user for demo purposes if it doesn't exist already
+            if (!connectedUsers.has('alice') && currentUsername !== 'alice') {
+                connectedUsers.add('alice');
+                addUser('alice');
+            }
+
+            const socket = new SockJS('http://localhost:8080/ws');
+            stompClient = Stomp.over(socket);
+            
+            // Connect with the username
+            stompClient.connect({
+                'username': currentUsername
+            }, onConnected, onError);
+        }
+
+        function onConnected() {
+            // Subscribe to the Public Topic
+            stompClient.subscribe('/broadcast/public', onPublicMessageReceived);
+            
+            // Subscribe to Private Messages
+            stompClient.subscribe('/user/direct/messages', onPrivateMessageReceived);
+            
+            // Tell everyone you're here
+            stompClient.send("/app/chat.register", {}, 
+                JSON.stringify({
+                    from: currentUsername,
+                    type: 'JOIN'
+                })
+            );
+            
+            // Add yourself to the users list if not already there
+            if (!connectedUsers.has(currentUsername)) {
+                connectedUsers.add(currentUsername);
+                addUser(currentUsername);
+            }
+            
+            // Update UI state
+            connectButton.style.display = 'none';
+            disconnectButton.style.display = 'inline-block';
+            usernameInput.disabled = true;
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            
+            // Add a system message
+            addMessage({
+                from: 'System',
+                content: 'You have joined the chat as ' + currentUsername,
+                type: 'SYSTEM'
+            });
+        }
+
+        function onError(error) {
+            console.error('Failed to connect', error);
+            addMessage({
+                from: 'System',
+                content: 'Could not connect to WebSocket server. Please refresh this page and try again!',
+                type: 'SYSTEM'
+            });
+        }
+
+        function onPublicMessageReceived(payload) {
+            const message = JSON.parse(payload.body);
+            
+            if (message.type === 'JOIN') {
+                // Someone joined
+                if (!connectedUsers.has(message.from) && message.from !== currentUsername) {
+                    connectedUsers.add(message.from);
+                    addUser(message.from);
+                    
+                    addMessage({
+                        from: 'System',
+                        content: message.from + ' joined the chat',
+                        type: 'SYSTEM'
+                    });
+                }
+            } else if (message.type === 'LEAVE') {
+                // Someone left
+                if (connectedUsers.has(message.from)) {
+                    connectedUsers.delete(message.from);
+                    removeUser(message.from);
+                    
+                    addMessage({
+                        from: 'System',
+                        content: message.from + ' left the chat',
+                        type: 'SYSTEM'
+                    });
+                }
+            } else {
+                // Regular public message
+                addMessage(message);
+            }
+        }
+
+        function onPrivateMessageReceived(payload) {
+            const message = JSON.parse(payload.body);
+            message.isPrivate = true;
+            addMessage(message);
+            
+            // If the sender is not in the user list, add them
+            if (!connectedUsers.has(message.from)) {
+                connectedUsers.add(message.from);
+                addUser(message.from);
+            }
+        }
+
+        function sendMessage() {
+            const messageContent = messageInput.value.trim();
+            if (messageContent && stompClient) {
+                const chatMessage = {
+                    from: currentUsername,
+                    content: messageContent,
+                    type: 'CHAT'
+                };
+
+                if (selectedUser === 'public') {
+                    // Sending message to public channel
+                    stompClient.send("/app/broadcast", {}, JSON.stringify(chatMessage));
+                } else {
+                    // Sending private message
+                    chatMessage.to = selectedUser;
+                    stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
+                    
+                    // Also display the sent message in the UI
+                    chatMessage.isPrivate = true;
+                    addMessage(chatMessage);
+                }
+
+                messageInput.value = '';
+            }
+        }
+
+        function addMessage(message) {
+            const messageElement = document.createElement('div');
+            
+            // Determine message type
+            if (message.type === 'SYSTEM') {
+                messageElement.classList.add('message', 'system');
+                messageElement.textContent = message.content;
+            } else {
+                if (message.isPrivate) {
+                    messageElement.classList.add('message', 'private');
+                } else {
+                    messageElement.classList.add('message', 'public');
+                }
+                
+                const senderElement = document.createElement('div');
+                senderElement.classList.add('sender');
+                
+                if (message.from === currentUsername) {
+                    senderElement.textContent = 'You';
+                    if (message.isPrivate) {
+                        senderElement.textContent += ' → ' + message.to;
+                    }
+                } else {
+                    senderElement.textContent = message.from;
+                    if (message.isPrivate) {
+                        senderElement.textContent += ' → You (Private)';
+                    }
+                }
+                
+                const contentElement = document.createElement('div');
+                contentElement.textContent = message.content;
+                
+                messageElement.appendChild(senderElement);
+                messageElement.appendChild(contentElement);
+            }
+            
+            messageList.appendChild(messageElement);
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        function addUser(username) {
+            const userElement = document.createElement('div');
+            userElement.classList.add('user');
+            userElement.textContent = username;
+            userElement.dataset.username = username;
+            
+            userElement.addEventListener('click', function() {
+                document.querySelectorAll('.user').forEach(u => u.classList.remove('selected'));
+                userElement.classList.add('selected');
+                selectedUser = username;
+                
+                if (selectedUser === 'public') {
+                    messageInput.placeholder = 'Message to public channel...';
+                } else {
+                    messageInput.placeholder = 'Private message to ' + selectedUser + '...';
+                }
+            });
+            
+            users.appendChild(userElement);
+        }
+
+        function removeUser(username) {
+            const userElement = document.querySelector(`.user[data-username="${username}"]`);
+            if (userElement) {
+                userElement.remove();
+                
+                // If the selected user is removed, switch to public
+                if (selectedUser === username) {
+                    selectedUser = 'public';
+                    document.querySelector('.user[data-username="public"]').classList.add('selected');
+                    messageInput.placeholder = 'Message to public channel...';
+                }
+            }
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                // Tell everyone you're leaving
+                stompClient.send("/app/chat.register", {}, 
+                    JSON.stringify({
+                        from: currentUsername,
+                        type: 'LEAVE'
+                    })
+                );
+                
+                stompClient.disconnect();
+            }
+            
+            // Reset UI state
+            connectButton.style.display = 'inline-block';
+            disconnectButton.style.display = 'none';
+            usernameInput.disabled = false;
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            
+            // Add a system message
+            addMessage({
+                from: 'System',
+                content: 'You have been disconnected',
+                type: 'SYSTEM'
+            });
+            
+            stompClient = null;
+        }
+    </script>
+</body>
+</html>
