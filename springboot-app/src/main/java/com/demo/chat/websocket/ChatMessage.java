@@ -1,4 +1,4 @@
-package com.demo.sockjs.websocket;
+package com.demo.chat.websocket;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,10 +9,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ChatMessage {
 
-    private String type;  // "public", "private", "group"
+    private String type;
     private String sender;
-    private String recipient; // For private messages
-    private String group;  // For group messages
+    private String recipient;
+    private String group;
     private String content;
 
 }

@@ -48,13 +48,13 @@
 
         function sendBroadcast() {
             var message = document.getElementById("message").value;
-            stompClient.send("/app/broadcast", { "token1": "token" }, JSON.stringify({ sender: user, content: message }));
+            stompClient.send("/app/broadcast", { "token": "token" }, JSON.stringify({ sender: user, content: message }));
         }
 
         function sendPrivate() {
             var recipient = document.getElementById("recipient").value;
             var message = document.getElementById("privateMessage").value;
-            stompClient.send("/app/private", { "token1": "token" }, JSON.stringify({ sender: user, recipient: recipient, content: message }));
+            stompClient.send("/app/private", { "token": "token" }, JSON.stringify({ sender: user, recipient: recipient, content: message }));
         }
 
         function showMessage(message) {

@@ -1,6 +1,5 @@
-package com.demo.sockjs.websocket;
+package com.demo.chat.websocket;
 
-import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;

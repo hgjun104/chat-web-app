@@ -1,4 +1,4 @@
-package com.demo.sockjs.websocket;
+package com.demo.chat.websocket;
 
 import org.springframework.stereotype.Component;
 
