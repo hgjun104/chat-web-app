@@ -27,6 +27,7 @@ public class UserSessionStore {
     }
 
     public void disconnect(String sessionId) {
+        if (sessionId == null) return;
         for (Map.Entry<String, List<String>> entry : users.entrySet()) {
             List<String> sessions = entry.getValue();
             if (sessions.remove(sessionId)) {

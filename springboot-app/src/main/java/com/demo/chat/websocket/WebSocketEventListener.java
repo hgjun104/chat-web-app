@@ -11,13 +11,13 @@ public class WebSocketEventListener {
 
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectEvent event) {
-        System.out.println("New WebSocket connection: " + event.getMessage().getHeaders());
+        StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
+        System.out.println("User Connected: " + headerAccessor.getUser());
     }
 
     @EventListener
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
-        String sessionId = headerAccessor.getSessionId();
-        System.out.println("User Disconnected: " + sessionId);
+        System.out.println("User Disconnected: " + headerAccessor.getUser());
     }
 }
